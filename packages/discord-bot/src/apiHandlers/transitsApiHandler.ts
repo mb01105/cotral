@@ -2,7 +2,7 @@ import {
     EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle,
     StringSelectMenuBuilder, type CommandInteraction, type MessageComponentInteraction,
 } from 'discord.js';
-import type { Pole, Transit } from '@cotral/shared';
+import { type Pole, type Transit, getTransitTrackingStatus } from '@cotral/shared';
 import { api } from '../services/axiosService';
 import { Emoji, Color, divider, relativeTime, nowTimestamp, parseTime, errorEmbed } from '../utils/formatting';
 import { handleApiError } from './errorHandler';
@@ -35,8 +35,10 @@ function findNextDepartureIndex(transits: Transit[]): number {
 
 // ── Embed builders ───────────────────────────────────────────
 
-function hasAnyDelay(transits: Transit[]): boolean {
-    return transits.some(t => t.ritardo && t.ritardo !== '00:00');
+function hasRealtimeDelay(transits: Transit[]): boolean {
+    return transits.some(t =>
+        getTransitTrackingStatus(t) === 'realtime' && t.ritardo && t.ritardo !== '00:00' && !t.ritardo.startsWith('-')
+    );
 }
 
 function buildTransitsEmbed(pole: Pole, transits: Transit[], nextIndex: number): EmbedBuilder {
@@ -49,36 +51,54 @@ function buildTransitsEmbed(pole: Pole, transits: Transit[], nextIndex: number):
         const route = `**${t.partenzaCorsa} → ${t.arrivoCorsa}**`;
         const time = t.orarioPartenzaCorsa || '??:??';
         const rel = relativeTime(t.orarioPartenzaCorsa);
-        const delay = t.ritardo && t.ritardo !== '00:00'
-            ? `${Emoji.DELAY} +${t.ritardo}`
-            : `${Emoji.GREEN} Puntuale`;
-
-        lines.push(`${prefix} ${route} — \`${time}\` ${rel} — ${delay}`);
+        const status = getTransitTrackingStatus(t);
+        let statusBadge: string;
+        if (status === 'realtime') {
+            if (t.ritardo && t.ritardo !== '00:00') {
+                const isAhead = t.ritardo.startsWith('-');
+                statusBadge = isAhead ? `${Emoji.GREEN} -${t.ritardo.slice(1)}` : `${Emoji.DELAY} +${t.ritardo}`;
+            } else {
+                statusBadge = `${Emoji.GREEN} Real-time`;
+            }
+        } else if (status === 'monitored_offline') {
+            statusBadge = '🟡 Tracciata';
+        } else {
+            statusBadge = '⚪ Schedulata';
+        }
+        lines.push(`${prefix} ${route} — \`${time}\` ${rel} — ${statusBadge}`);
     });
 
     if (!lines.length) lines.push('*Nessun transito disponibile.*');
 
-    // Color: red if any delay, gold if next found, blue default
+    const realtimeCount = transits.filter(t => getTransitTrackingStatus(t) === 'realtime').length;
+    const scheduledCount = transits.length - realtimeCount;
+
     let color = Color.PRIMARY;
-    if (hasAnyDelay(transits)) color = Color.ERROR;
+    if (hasRealtimeDelay(transits)) color = Color.ERROR;
     else if (nextIndex >= 0) color = Color.NEXT;
+
+    const footerParts: string[] = [];
+    footerParts.push(`Codice: ${pole.codicePalina}`);
+    if (realtimeCount > 0) footerParts.push(`${realtimeCount} real-time, ${scheduledCount} schedulate`);
+    else footerParts.push(`${transits.length} schedulate`);
 
     const embed = new EmbedBuilder()
         .setColor(color)
         .setTitle(title)
         .setDescription(lines.join('\n'))
-        .setFooter({ text: `Codice: ${pole.codicePalina}` })
+        .setFooter({ text: footerParts.join(' · ') })
         .setTimestamp();
 
     return embed;
 }
 
 function buildTransitDetailEmbed(transit: Transit, isNext: boolean): EmbedBuilder {
-    const isDelayed = transit.ritardo && transit.ritardo !== '00:00';
+    const status = getTransitTrackingStatus(transit);
+    const isRealDelay = status === 'realtime' && transit.ritardo && transit.ritardo !== '00:00' && !transit.ritardo.startsWith('-');
     let color = Color.PRIMARY;
-    if (isDelayed) color = Color.ERROR;
+    if (isRealDelay) color = Color.ERROR;
     else if (isNext) color = Color.NEXT;
-    else color = Color.SUCCESS;
+    else if (status === 'realtime') color = Color.SUCCESS;
     const embed = new EmbedBuilder().setColor(color).setTimestamp();
 
     const lines: string[] = [];
@@ -97,10 +117,18 @@ function buildTransitDetailEmbed(transit: Transit, isNext: boolean): EmbedBuilde
         lines.push(`${Emoji.CLOCK} **Durata:** ${transit.tempoTransito}`);
     }
 
-    if (transit.ritardo && transit.ritardo !== '00:00') {
-        lines.push(`${Emoji.DELAY} **Ritardo:** ${transit.ritardo}`);
+    if (status === 'realtime') {
+        if (transit.ritardo && transit.ritardo !== '00:00') {
+            const isAhead = transit.ritardo.startsWith('-');
+            const label = isAhead ? `Anticipo: ${transit.ritardo.slice(1)}` : `Ritardo: ${transit.ritardo}`;
+            lines.push(`${Emoji.GREEN} **Real-time** · ${Emoji.DELAY} **${label}**`);
+        } else {
+            lines.push(`${Emoji.GREEN} **Real-time · puntuale**`);
+        }
+    } else if (status === 'monitored_offline') {
+        lines.push(`🟡 **Tracciata** *(bus non in trasmissione)*`);
     } else {
-        lines.push(`${Emoji.GREEN} **Puntuale**`);
+        lines.push(`⚪ **Schedulata** *(orario teorico, no real-time)*`);
     }
 
     if (transit.instradamento) {
@@ -108,8 +136,8 @@ function buildTransitDetailEmbed(transit: Transit, isNext: boolean): EmbedBuilde
     }
 
     if (transit.automezzo?.codice) {
-        const status = transit.automezzo.isAlive ? `${Emoji.GREEN} In tempo reale` : `${Emoji.RED} Ultima posizione nota`;
-        lines.push(`${Emoji.GEAR} **Mezzo:** \`${transit.automezzo.codice}\` — ${status}`);
+        const trackingText = transit.automezzo.isAlive ? `${Emoji.GREEN} In tempo reale` : `${Emoji.RED} Ultima posizione nota`;
+        lines.push(`${Emoji.GEAR} **Mezzo:** \`${transit.automezzo.codice}\` — ${trackingText}`);
     }
 
     embed.setDescription(lines.join('\n'));

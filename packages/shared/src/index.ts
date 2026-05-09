@@ -3,3 +3,8 @@ export { Stop } from './interfaces/Stop';
 export { Transit } from './interfaces/Transit';
 export { Vehicle } from './interfaces/Vehicle';
 export { VehiclePosition } from './interfaces/VehiclePosition';
+export {
+    TransitTrackingStatus,
+    getTransitTrackingStatus,
+    isDelayInfoReliable,
+} from './utils/transitStatus';

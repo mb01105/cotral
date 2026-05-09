@@ -1,5 +1,5 @@
 import { Context } from 'telegraf';
-import { Transit, Pole } from '@cotral/shared';
+import { Transit, Pole, getTransitTrackingStatus } from '@cotral/shared';
 import { fetchData } from '../utils/apiUtils';
 import { logger } from '../utils/logger';
 import { Emoji, bold, escapeHtml, divider, relativeTime, parseTime, nowTimestamp } from '../utils/messageFormatting';
@@ -31,6 +31,9 @@ function findNextDepartureIndex(transits: Transit[]): number {
 }
 
 function buildTransitSelectionList(sorted: Transit[], nextIdx: number, poleName: string, poleCode: string) {
+    const realtimeCount = sorted.filter(t => getTransitTrackingStatus(t) === 'realtime').length;
+    const scheduledCount = sorted.length - realtimeCount;
+
     let nextSummary = '';
     if (nextIdx >= 0) {
         const nextTime = sorted[nextIdx].orarioPartenzaCorsa;
@@ -38,9 +41,13 @@ function buildTransitSelectionList(sorted: Transit[], nextIdx: number, poleName:
         nextSummary = rt ? `\n${Emoji.BUS} Prossimo: ${escapeHtml(nextTime)} ${rt}` : '';
     }
 
+    const counts = realtimeCount > 0
+        ? `${sorted.length} cors${sorted.length === 1 ? 'a' : 'e'} (${realtimeCount} real-time, ${scheduledCount} schedulat${scheduledCount === 1 ? 'a' : 'e'})`
+        : `${sorted.length} cors${sorted.length === 1 ? 'a' : 'e'} schedulat${sorted.length === 1 ? 'a' : 'e'}`;
+
     const header = [
         `${Emoji.BUSSTOP} <b>Transiti per: ${poleName}</b>`,
-        `${Emoji.CLOCK} Aggiornato alle ${nowTimestamp()} \u2014 ${sorted.length} cors${sorted.length === 1 ? 'a' : 'e'}${nextSummary}`,
+        `${Emoji.CLOCK} Aggiornato alle ${nowTimestamp()} \u2014 ${counts}${nextSummary}`,
         '',
         '<i>Seleziona un transito per i dettagli:</i>',
     ].join('\n');
@@ -55,8 +62,12 @@ function buildTransitSelectionList(sorted: Transit[], nextIdx: number, poleName:
         const rel = t.orarioPartenzaCorsa ? relativeTime(t.orarioPartenzaCorsa) : '';
         const cleanRel = rel.replace(/<\/?[^>]+(>|$)/g, '');
         const isNext = i === nextIdx;
-        const prefix = isNext ? '\u{1F4A8} ' : `${Emoji.BUS} `;
-        const delayMark = (t.ritardo && t.ritardo !== '00:00') ? ` \u{1F6A8}${t.ritardo}` : '';
+        const status = getTransitTrackingStatus(t);
+        // Status glyph: \u25cf real-time, \u25d0 monitored offline, \u25cb scheduled
+        const statusGlyph = status === 'realtime' ? '\u25cf' : status === 'monitored_offline' ? '\u25d0' : '\u25cb';
+        const prefix = isNext ? `\u{1F4A8}${statusGlyph} ` : `${statusGlyph} `;
+        // Delay only when reliable (real-time tracking active)
+        const delayMark = (status === 'realtime' && t.ritardo && t.ritardo !== '00:00') ? ` \u{1F6A8}${t.ritardo}` : '';
         const label = `${prefix}${time} \u2192 ${dest} ${cleanRel}${delayMark}`;
         buttons.push([{ text: label, callback_data: `td:${poleCode}:${i}` }]);
     }
@@ -225,10 +236,19 @@ function formatTransitMessage(transit: Transit, isNext: boolean): string {
         lines.push(`${Emoji.CLOCK} Durata: ${escapeHtml(transit.tempoTransito)}`);
     }
 
-    if (transit.ritardo && transit.ritardo !== '00:00') {
-        lines.push(`${Emoji.DELAY} <b>Ritardo: ${escapeHtml(transit.ritardo)}</b>`);
+    const status = getTransitTrackingStatus(transit);
+    if (status === 'realtime') {
+        if (transit.ritardo && transit.ritardo !== '00:00') {
+            const isAhead = transit.ritardo.startsWith('-');
+            const label = isAhead ? `Anticipo: ${escapeHtml(transit.ritardo.slice(1))}` : `Ritardo: ${escapeHtml(transit.ritardo)}`;
+            lines.push(`${Emoji.GREEN} <b>Real-time</b> \u00b7 ${Emoji.DELAY} <b>${label}</b>`);
+        } else {
+            lines.push(`${Emoji.GREEN} <b>Real-time \u00b7 puntuale</b>`);
+        }
+    } else if (status === 'monitored_offline') {
+        lines.push(`\u{1F7E1} <b>Tracciata</b> <i>(bus non in trasmissione)</i>`);
     } else {
-        lines.push(`${Emoji.GREEN} Puntuale`);
+        lines.push(`\u26aa <b>Schedulata</b> <i>(orario teorico, no real-time)</i>`);
     }
 
     if (transit.instradamento) {
@@ -238,8 +258,6 @@ function formatTransitMessage(transit: Transit, isNext: boolean): string {
     if (transit.automezzo?.codice) {
         const trackingText = transit.automezzo.isAlive ? `${Emoji.GREEN} In tempo reale` : `${Emoji.CLOCK} Ultima posizione nota`;
         lines.push(`${Emoji.GEAR} Mezzo: ${escapeHtml(transit.automezzo.codice)} \u2014 ${trackingText}`);
-    } else {
-        lines.push(`${Emoji.GEAR} <i>Posizione veicolo non disponibile</i>`);
     }
 
     lines.push(divider());
