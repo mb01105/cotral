@@ -96,11 +96,14 @@ function buildPoleSelectMenu(poles: Pole[], page: number = 0): ActionRowBuilder<
     const start = page * pageSize;
     const slice = poles.slice(start, start + pageSize);
 
-    const options = slice.map(p => ({
-        label: (p.nomePalina || p.nomeStop || 'Palina').slice(0, 100),
-        description: [p.localita, p.distanza ? `${p.distanza}` : ''].filter(Boolean).join(' • ').slice(0, 100) || undefined,
-        value: `sel:pole:${p.codicePalina}`,
-    }));
+    const options = slice.map(p => {
+        const dests = p.destinazioni?.length ? `→ ${p.destinazioni.slice(0, 3).join(', ')}` : '';
+        return {
+            label: (p.nomePalina || p.nomeStop || 'Palina').slice(0, 100),
+            description: [p.localita, p.distanza, dests].filter(Boolean).join(' • ').slice(0, 100) || undefined,
+            value: `sel:pole:${p.codicePalina}`,
+        };
+    });
 
     const menu = new StringSelectMenuBuilder()
         .setCustomId('pole_select')
@@ -261,9 +264,13 @@ export async function displayFavoritePoles(interaction: Interaction, userId: str
         const embed = new EmbedBuilder()
             .setColor(Color.PRIMARY)
             .setTitle(`${Emoji.STAR} Le tue paline preferite (${poles.length})`)
-            .setDescription(poles.map(p =>
-                `${Emoji.BUSSTOP} **${p.nomePalina || p.nomeStop || p.codicePalina}** — \`${p.codicePalina}\``
-            ).join('\n'));
+            .setDescription(poles.map(p => {
+                const name = p.nomePalina || p.nomeStop || p.codicePalina;
+                const dests = p.destinazioni?.length
+                    ? ` → _${p.destinazioni.slice(0, 2).join(', ')}${p.destinazioni.length > 2 ? ` +${p.destinazioni.length - 2}` : ''}_`
+                    : ` — \`${p.codicePalina}\``;
+                return `${Emoji.BUSSTOP} **${name}**${dests}`;
+            }).join('\n'));
 
         await interaction.editReply({ embeds: [embed], components: [buildPoleSelectMenu(poles)] });
     } catch (error) {

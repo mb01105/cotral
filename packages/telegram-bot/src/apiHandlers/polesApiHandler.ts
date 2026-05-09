@@ -146,6 +146,16 @@ export async function displaySinglePoleDetails(ctx: Context, poleCode: string, u
     }
 }
 
+function formatFavoritePoleLabel(pole: Pole): string {
+    const name = pole.nomePalina ?? 'Palina';
+    const dests = pole.destinazioni ?? [];
+    if (dests.length === 0) {
+        return `${Emoji.BUSSTOP} ${name} (${pole.codicePalina})`;
+    }
+    const extra = dests.length > 1 ? ` +${dests.length - 1}` : '';
+    return `${Emoji.BUSSTOP} ${name} → ${dests[0]}${extra}`;
+}
+
 export async function getFavoritePolesButtons(ctx: ExtendedContext) {
     const userId = ctx.from?.id;
     if (!userId) return [];
@@ -153,7 +163,7 @@ export async function getFavoritePolesButtons(ctx: ExtendedContext) {
     const favoritePoles = await fetchFavoritePoles(userId);
     return favoritePoles.flatMap(item =>
         item.codicePalina
-            ? [Markup.button.callback(`${Emoji.BUSSTOP} ${item.nomePalina ?? 'Palina'} (${item.codicePalina})`, `sel:pole:${item.codicePalina}`)]
+            ? [Markup.button.callback(formatFavoritePoleLabel(item), `sel:pole:${item.codicePalina}`)]
             : []
     );
 }
@@ -182,9 +192,8 @@ export async function displayFavoritePoles(ctx: Context, userId: number): Promis
         const buttons: { text: string; callback_data: string }[][] = [];
         for (const pole of poles) {
             if (!pole.codicePalina) continue;
-            const name = pole.nomePalina ?? 'Palina';
             buttons.push([
-                { text: `${Emoji.BUSSTOP} ${name} (${pole.codicePalina})`, callback_data: `sel:pole:${pole.codicePalina}` },
+                { text: formatFavoritePoleLabel(pole), callback_data: `sel:pole:${pole.codicePalina}` },
             ]);
         }
         buttons.push([{ text: `${Emoji.BACK} Menu principale`, callback_data: 'MAIN_MENU' }]);
