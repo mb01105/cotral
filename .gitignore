@@ -3,6 +3,8 @@ dist/
 *.tsbuildinfo
 .env
 .deploy.env
+deploy.sh
+deploy.bat
 *.log
 *.sqlite
 .DS_Store

@@ -98,30 +98,6 @@ Caratteristiche:
 - Tutti i container girano in `Europe/Rome` (`TZ` impostato sia in `docker-compose.yml` che nel `Dockerfile` con `tzdata`)
 - Volumi nominati per persistenza GTFS / SQLite / sessioni Telegram
 
-## Deploy remoto
-
-`deploy.sh` (Bash, pensato per Windows + Git Bash + PuTTY) impacchetta i sorgenti, li trasferisce sul server target via `pscp`, ricostruisce i container e registra gli slash commands Discord.
-
-```bash
-./deploy.sh                       # deploy completo
-./deploy.sh --skip-build          # salta il check build locale
-./deploy.sh --skip-discord-commands
-./deploy.sh --logs                # mostra i log dopo il deploy
-./deploy.sh --help
-```
-
-Configurazione (in `.deploy.env`, gitignored):
-
-```env
-SERVER_IP=...
-SERVER_PORT=...
-SERVER_USER=...
-SERVER_HOSTKEY=SHA256:...
-DEPLOY_PASSWORD=...
-```
-
-Su Windows è disponibile `deploy.bat` come wrapper che richiama `deploy.sh` via Git Bash.
-
 ## Test
 
 ```bash
@@ -142,8 +118,6 @@ cotral/
 │   └── discord-bot/     # bot Discord
 ├── Dockerfile           # multi-stage: build comune + 3 immagini finali
 ├── docker-compose.yml   # stack server + bot
-├── deploy.sh            # deploy remoto via SSH/SCP
-├── deploy.bat           # wrapper Windows
 └── package.json         # workspaces npm
 ```
 
