@@ -1,7 +1,7 @@
-# Cotral Server API
+# @cotral/server
 
 <div align="center">
-  <img src="logo.png" alt="CotralServerAPI" width="200">
+  <img src="../../logo.png" alt="Cotral" width="200">
 </div>
 
 <div align="center">
@@ -9,160 +9,154 @@
 [![TypeScript](https://img.shields.io/badge/TypeScript-007ACC?style=for-the-badge&logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
 [![Fastify](https://img.shields.io/badge/fastify-%23000000.svg?style=for-the-badge&logo=fastify&logoColor=white)](https://www.fastify.io/)
 [![SQLite](https://img.shields.io/badge/sqlite-%2307405e.svg?style=for-the-badge&logo=sqlite&logoColor=white)](https://www.sqlite.org/)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg?style=for-the-badge)](https://opensource.org/licenses/MIT)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg?style=for-the-badge)](../../LICENSE)
 
-[![Sponsor](https://img.shields.io/badge/Sponsor-GitHub-EA4AAA?style=for-the-badge&logo=github-sponsors&logoColor=white)](https://github.com/sponsors/ChromuSx)
-[![Ko-fi](https://img.shields.io/badge/Support-Ko--fi-FF5E5B?style=for-the-badge&logo=ko-fi&logoColor=white)](https://ko-fi.com/chromus)
-[![Buy Me a Coffee](https://img.shields.io/badge/Buy%20Me%20a%20Coffee-FFDD00?style=for-the-badge&logo=buy-me-a-coffee&logoColor=black)](https://buymeacoffee.com/chromus)
-[![PayPal](https://img.shields.io/badge/Donate-PayPal-00457C?style=for-the-badge&logo=paypal&logoColor=white)](https://www.paypal.com/paypalme/giovanniguarino1999)
+**API REST per i dati del trasporto pubblico Cotral**
 
-**API REST per l'accesso ai dati del trasporto pubblico Cotral**
-
-[Documentazione API](./OpenAPI.yaml) | [Segnala Bug](https://github.com/ChromuSx/cotral-server-api/issues)
+[Documentazione OpenAPI](./OpenAPI.yaml) · [Issue tracker](https://github.com/ChromuSx/cotral/issues)
 
 </div>
 
-## Descrizione
+> Pacchetto del [monorepo Cotral](../../README.md). Per installazione e build dell'intero stack vedi il README di root.
 
-Cotral Server API e' un servizio backend TypeScript che fornisce dati del trasporto pubblico Cotral. Utilizza i dati GTFS (General Transit Feed Specification) come fonte primaria per fermate, paline e percorsi, con fallback sulle API XML di Cotral per i dati in tempo reale (transiti e posizioni veicoli).
+## Cosa fa
 
-## Caratteristiche
+Fornisce un'API REST unificata sopra due fonti dati:
 
-- **Dati GTFS offline** - Fermate, paline e percorsi caricati dai file GTFS Cotral (download automatico se assenti)
-- **Transiti real-time** - Monitoraggio arrivi in tempo reale tramite API Cotral
-- **Tracking veicoli** - Posizioni GPS dei veicoli in servizio
-- **Gestione preferiti** - Paline preferite per utente con persistenza SQLite
-- **Auto-reload GTFS** - Ricarica automatica quando i file vengono aggiornati
-- **API RESTful** con documentazione OpenAPI
+- **GTFS Cotral** (offline) — fermate, paline, percorsi, destinazioni. Caricato in memoria all'avvio (~14k fermate, ~4.3k linee). Auto-refresh quando i file vengono aggiornati.
+- **API XML Cotral** (online) — transiti real-time, posizioni veicoli. Usata anche come fallback quando il GTFS non basta.
 
-## Stack Tecnologico
+I preferiti per utente sono persistiti in SQLite (`better-sqlite3`).
+
+## Stack
 
 | Tecnologia | Utilizzo |
 |------------|----------|
 | **TypeScript** | Linguaggio principale |
-| **Fastify** | Framework web |
-| **better-sqlite3** | Database per preferiti |
-| **Axios** | Client HTTP per API Cotral |
-| **xml2js** | Parser XML per risposte Cotral |
-| **adm-zip** | Estrazione ZIP GTFS |
-| **Vitest** | Test framework |
-
-## Architettura
-
-```
-packages/server/
-├── src/
-│   ├── controllers/        # Gestione richieste HTTP
-│   ├── services/           # Logica di business
-│   │   ├── gtfsService.ts  # Caricamento e query dati GTFS
-│   │   ├── polesService.ts # Paline (GTFS + API fallback)
-│   │   ├── stopsService.ts # Fermate (GTFS + API fallback)
-│   │   ├── transitsService.ts  # Transiti real-time (API)
-│   │   └── vehiclesService.ts  # Posizioni veicoli (API)
-│   ├── routes/             # Definizione route Fastify
-│   ├── utils/
-│   │   ├── cotralApi.ts    # Helper chiamate API Cotral
-│   │   ├── gtfsDownloader.ts   # Download automatico GTFS
-│   │   └── timeUtils.ts    # Conversione tempi
-│   ├── config.ts           # Configurazione centralizzata
-│   ├── database.ts         # Gestione SQLite
-│   └── app.ts              # Entry point
-├── GTFS_COTRAL/            # File GTFS (scaricati automaticamente)
-├── OpenAPI.yaml            # Documentazione API
-└── database.sqlite         # Database preferiti (generato)
-```
-
-## Prerequisiti
-
-- **Node.js** >= 18.x
-- **npm** >= 8.x
-
-## Installazione
-
-```bash
-git clone https://github.com/ChromuSx/cotral-server-api.git
-cd cotral-server-api
-npm install
-```
+| **Fastify** | Framework HTTP |
+| **better-sqlite3** | Storage preferiti |
+| **Axios** + **xml2js** | Client per le API XML Cotral |
+| **adm-zip** | Estrazione archivio GTFS |
+| **Vitest** | Test |
 
 ## Configurazione
 
-Crea un file `.env` (oppure copia `.env.example`):
+Variabili d'ambiente (in `packages/server/.env` per sviluppo locale, oppure passate dal `docker-compose.yml`):
 
-```env
-PORT=3000
-HOST=127.0.0.1
-DB_PATH=./database.sqlite
-GTFS_PATH=./GTFS_COTRAL
-GTFS_URL=https://travel.mob.cotralspa.it:4443/GTFS/GTFS_COTRAL.zip
-COTRAL_BASE_URL=http://travel.mob.cotralspa.it:7777/beApp
-COTRAL_USER_ID=your_user_id_here
-COTRAL_DELTA=261
-```
+| Variabile | Default | Descrizione |
+|-----------|---------|-------------|
+| `PORT` | `3000` | Porta HTTP |
+| `HOST` | `127.0.0.1` | Interfaccia di bind (`0.0.0.0` in Docker) |
+| `DB_PATH` | `./database.sqlite` | Path SQLite dei preferiti |
+| `GTFS_PATH` | `./GTFS_COTRAL` | Cartella dove vivono i file GTFS estratti |
+| `GTFS_URL` | URL ufficiale Cotral | Da dove scaricare l'archivio GTFS |
+| `COTRAL_BASE_URL` | URL ufficiale Cotral | Endpoint XML real-time |
+| `COTRAL_USER_ID` | preset | Token utente per le API XML (è quello pubblico dell'app Cotral) |
+| `COTRAL_DELTA` | `261` | Parametro proprietario `pDelta` richiesto dall'API XML — finestra in minuti per la lookahead dei transiti |
+| `TZ` | (host) | In Docker è `Europe/Rome`, necessaria perché tutti i timestamp sono trattati come ora locale italiana |
 
-I dati GTFS vengono scaricati automaticamente al primo avvio se la cartella `GTFS_COTRAL` non esiste.
+I file GTFS vengono scaricati automaticamente al primo avvio se `GTFS_PATH` non esiste (~52 MB).
 
 ## Avvio
 
+Dalla root del monorepo:
+
 ```bash
+npm run start:server
+```
+
+Oppure dentro al pacchetto:
+
+```bash
+cd packages/server
 npm start
 ```
 
-Il server:
-1. Verifica la presenza dei file GTFS, li scarica se assenti (~52 MB)
-2. Carica i dati GTFS in memoria (~14.000 fermate, ~4.300 linee)
-3. Avvia il server su `http://localhost:3000`
+In avvio il server:
+1. Inizializza il DB SQLite e crea la tabella `favorite_poles` se manca
+2. Verifica i file GTFS, li scarica se assenti
+3. Carica le tabelle GTFS in memoria
+4. Espone le route HTTP
 
-## API Endpoints
+## API endpoints
+
+### Località
+
+| Metodo | Endpoint | Descrizione |
+|--------|----------|-------------|
+| GET | `/localities/search?query=X&limit=N` | Autocompletamento località (max 25) |
 
 ### Fermate (Stops)
 
 | Metodo | Endpoint | Descrizione |
 |--------|----------|-------------|
-| GET | `/stops/{locality}` | Fermate per localita' |
-| GET | `/stops/firststop/{locality}` | Prima fermata per localita' |
+| GET | `/stops/{locality}` | Tutte le fermate di una località |
+| GET | `/stops/firststop/{locality}` | Prima fermata di una località |
 
 ### Paline (Poles)
 
 | Metodo | Endpoint | Descrizione |
 |--------|----------|-------------|
-| GET | `/poles/{stopCode}` | Paline vicine a un codice fermata |
 | GET | `/poles/position?latitude=X&longitude=Y&range=R` | Paline per posizione GPS |
-| GET | `/poles/{arrival}/{destination}` | Paline per percorso |
-| GET | `/poles/destinations/{arrivalLocality}` | Destinazioni disponibili |
-| GET | `/poles/favorites/{userId}` | Paline preferite |
-| POST | `/poles/favorites` | Aggiungi preferito (`{userId, poleCode, poleLat, poleLon}`) |
-| DELETE | `/poles/favorites` | Rimuovi preferito (`{userId, poleCode}`) |
+| GET | `/poles/destinations/{arrivalLocality}` | Destinazioni servite da una località |
+| GET | `/poles/{arrival}/{destination}` | Paline che servono un percorso |
+| GET | `/poles/{stopCode}` | Paline associate a una fermata GTFS |
+| GET | `/poles/favorites/{userId}` | Paline preferite di un utente |
+| POST | `/poles/favorites` | Aggiunge un preferito (`{userId, poleCode, poleLat, poleLon}`) |
+| DELETE | `/poles/favorites` | Rimuove un preferito (`{userId, poleCode}`) |
 
 ### Transiti (Transits)
 
 | Metodo | Endpoint | Descrizione |
 |--------|----------|-------------|
-| GET | `/transits/{poleCode}` | Transiti real-time per palina |
+| GET | `/transits/{poleCode}` | Transiti per palina (real-time + schedulati) |
 
 ### Veicoli (Vehicles)
 
 | Metodo | Endpoint | Descrizione |
 |--------|----------|-------------|
-| GET | `/vehiclerealtimepositions/{vehicleCode}` | Posizione GPS veicolo |
+| GET | `/vehiclerealtimepositions/{vehicleCode}` | Posizione GPS di un veicolo |
+
+Schemi e parametri completi: [`OpenAPI.yaml`](./OpenAPI.yaml).
+
+## Architettura
+
+```
+src/
+├── controllers/        # binding HTTP (Fastify)
+├── routes/             # registrazione controller
+├── services/
+│   ├── gtfsService.ts      # caricamento e query GTFS in memoria
+│   ├── polesService.ts     # paline (GTFS primario, XML fallback)
+│   ├── stopsService.ts     # fermate
+│   ├── transitsService.ts  # transiti real-time (XML)
+│   └── vehiclesService.ts  # posizioni veicoli (XML)
+├── utils/
+│   ├── cotralApi.ts        # client XML Cotral con normalizzazione
+│   ├── gtfsDownloader.ts   # download e watch dell'archivio GTFS
+│   └── timeUtils.ts        # formattazione tempi
+├── config.ts           # config centralizzata da env
+├── database.ts         # gestione SQLite
+└── app.ts              # entry point Fastify
+```
+
+## Note tecniche peculiari
+
+Cose strane delle API Cotral che il server gestisce trasparentemente:
+
+- **`cmd=5` rotto**: l'endpoint XML "paline per fermata" non restituisce mai dati. Il workaround è prendere le coordinate dal GTFS e usare `cmd=7` (paline per posizione GPS). Vedi `polesService.getPolesByStopCode`.
+- **lat/lon invertiti in `cmd=1`**: l'API restituisce latitudine e longitudine swap per molte paline. `normalizeLatLon` in `utils/cotralApi.ts` corregge euristicamente quando lat < 20.
+- **`dataModifica` non è un timestamp**: è un numero opaco proprietario, non interpretabile come "X secondi fa". Per la freschezza dei dati i bot usano i flag `monitorata` + `automezzo.isAlive` (vedi [`getTransitTrackingStatus`](../shared/src/utils/transitStatus.ts)).
+- **`ritardo=00:00` su corse non monitorate** è il valore di default, non un dato reale. I bot lo nascondono quando `monitorata!=1`.
+- **Auto-reload GTFS**: i file vengono ricontrollati periodicamente; se aggiornati, le tabelle in memoria vengono ricaricate atomicamente senza downtime.
 
 ## Test
 
 ```bash
-npm test
+npm test                  # dalla root del monorepo
+npm run test:server       # solo questo pacchetto
 ```
-
-## Note tecniche
-
-- **GTFS come fonte primaria**: le ricerche fermate/paline usano i dati GTFS locali (istantanei). L'API Cotral XML e' usata come fallback e per i dati real-time (transiti, veicoli)
-- **cmd=5 dell'API Cotral e' rotto**: non restituisce mai paline. Il workaround usa le coordinate GPS dal GTFS + cmd=7
-- **Lat/lon swap in cmd=1**: l'API Cotral inverte latitudine/longitudine per molte paline. Il server normalizza automaticamente
-- **Auto-reload GTFS**: i file vengono ricontrollati ogni 60 secondi. Se aggiornati, i dati vengono ricaricati atomicamente
 
 ## Licenza
 
-MIT - Vedi [LICENSE](LICENSE)
-
-## Autore
-
-**Giovanni Guarino** - [@ChromuSx](https://github.com/ChromuSx)
+MIT — vedi [LICENSE](../../LICENSE).
