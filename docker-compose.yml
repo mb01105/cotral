@@ -4,6 +4,7 @@ services:
       context: .
       target: server
     environment:
+      TZ: Europe/Rome
       PORT: 3000
       HOST: 0.0.0.0
       DB_PATH: /data/database.sqlite
@@ -23,6 +24,7 @@ services:
       context: .
       target: telegram-bot
     environment:
+      TZ: Europe/Rome
       TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN}
       API_BASE_URL: http://server:3000
       SESSION_DB_PATH: /data/session_db.json
@@ -39,6 +41,7 @@ services:
       context: .
       target: discord-bot
     environment:
+      TZ: Europe/Rome
       DISCORD_BOT_TOKEN: ${DISCORD_BOT_TOKEN}
       DISCORD_CLIENT_ID: ${DISCORD_CLIENT_ID}
       API_BASE_URL: http://server:3000

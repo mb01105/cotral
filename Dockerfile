@@ -22,6 +22,8 @@ RUN npm run build && npm prune --omit=dev
 
 # ---- Server ----
 FROM node:20-alpine AS server
+RUN apk add --no-cache tzdata
+ENV TZ=Europe/Rome
 WORKDIR /app
 COPY --from=build /app ./
 EXPOSE 3000
@@ -29,12 +31,16 @@ CMD ["node", "packages/server/dist/app.js"]
 
 # ---- Telegram Bot ----
 FROM node:20-alpine AS telegram-bot
+RUN apk add --no-cache tzdata
+ENV TZ=Europe/Rome
 WORKDIR /app
 COPY --from=build /app ./
 CMD ["node", "packages/telegram-bot/dist/app.js"]
 
 # ---- Discord Bot ----
 FROM node:20-alpine AS discord-bot
+RUN apk add --no-cache tzdata
+ENV TZ=Europe/Rome
 WORKDIR /app
 COPY --from=build /app ./
 CMD ["node", "packages/discord-bot/dist/app.js"]
