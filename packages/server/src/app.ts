@@ -12,8 +12,8 @@ const createApp = async (): Promise<FastifyInstance> => {
     const app = await fastify({ logger: true });
 
     initDatabase();
-    await ensureGtfsData();
-    loadGtfs();
+    // await ensureGtfsData();
+    // loadGtfs();
 
     registerStopsRoutes(app);
     registerPolesRoutes(app);
